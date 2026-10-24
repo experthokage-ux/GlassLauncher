@@ -13,7 +13,10 @@ import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.addCallback
 import androidx.activity.compose.setContent
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.lifecycle.lifecycleScope
@@ -78,10 +81,16 @@ class MainActivity : ComponentActivity() {
             addDataScheme("package")
         })
         setContent {
-            HomeScreen(
-                repo, home, backdrop, wallpaper.value, wallpaperName.value, cc,
-                onLaunch = ::launch, onCommand = ::run,
-            )
+            // The layout is designed for a 960 dp wide screen (a 1080p Fire TV). TVs report all kinds of
+            // densities, so scale it to fill the screen whatever the resolution and dpi.
+            val width = resources.displayMetrics.widthPixels
+            val font = LocalDensity.current.fontScale
+            CompositionLocalProvider(LocalDensity provides Density(width / 960f, font)) {
+                HomeScreen(
+                    repo, home, backdrop, wallpaper.value, wallpaperName.value, cc,
+                    onLaunch = ::launch, onCommand = ::run,
+                )
+            }
         }
         loadWallpaper()
     }
