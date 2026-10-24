@@ -84,12 +84,15 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.fares.glass.R
@@ -525,16 +528,23 @@ class ControlCenter(
                 BasicText(wifi.ip ?: "", style = txt(fg.copy(alpha = 0.6f), 11.sp, FontWeight.Medium), maxLines = 1)
             }
             Spacer(Modifier.height(6.dp))
-            UsageBar(str(R.string.cc_memory), mem, fg, f)
+            // Both bars start where the longer label ends, so they line up in every language.
+            val labels = listOf(str(R.string.cc_memory), str(R.string.cc_storage))
+            val measurer = rememberTextMeasurer()
+            val labelStyle = txt(fg.copy(alpha = 0.75f), 11.sp, FontWeight.Medium)
+            val labelWidth = with(LocalDensity.current) {
+                labels.maxOf { measurer.measure(it, labelStyle).size.width }.toDp() + 8.dp
+            }
+            UsageBar(labels[0], labelWidth, mem, fg, f)
             Spacer(Modifier.height(4.dp))
-            UsageBar(str(R.string.cc_storage), disk, fg, f)
+            UsageBar(labels[1], labelWidth, disk, fg, f)
         }
     }
 
     @Composable
-    private fun UsageBar(label: String, u: SystemInfo.Usage, fg: Color, f: Float) {
+    private fun UsageBar(label: String, labelWidth: Dp, u: SystemInfo.Usage, fg: Color, f: Float) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            BasicText(label, Modifier.width(58.dp), style = txt(fg.copy(alpha = 0.75f), 11.sp, FontWeight.Medium))
+            BasicText(label, Modifier.width(labelWidth), style = txt(fg.copy(alpha = 0.75f), 11.sp, FontWeight.Medium), maxLines = 1)
             Canvas(Modifier.weight(1f).height(6.dp)) {
                 val r = CornerRadius(size.height / 2)
                 drawRoundRect(lerp(White.copy(alpha = 0.18f), Ink.copy(alpha = 0.12f), f), cornerRadius = r)
