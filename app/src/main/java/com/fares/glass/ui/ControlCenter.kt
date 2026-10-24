@@ -302,7 +302,9 @@ class ControlCenter(
             if (wifi.enabled) {
                 add(Line.Header(str(R.string.wifi_networks)))
                 wifi.networks.forEach { add(Line.Network(it)) }
-                if (wifi.networks.isEmpty()) add(Line.Note(str(R.string.wifi_searching)))
+                if (wifi.networks.isEmpty()) {
+                    add(Line.Note(str(if (wifi.searching) R.string.wifi_searching else R.string.wifi_none_found)))
+                }
                 add(Line.Action(str(R.string.wifi_rescan), Icons.Rounded.Search))
             }
             wifi.status?.let { add(Line.Note(it)) }

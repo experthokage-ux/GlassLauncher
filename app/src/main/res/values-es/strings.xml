@@ -39,6 +39,7 @@
     <!-- Control Center: Wi-Fi -->
     <string name="wifi_networks">Redes</string>
     <string name="wifi_searching">Buscando redes…</string>
+    <string name="wifi_none_found">No se encontraron redes</string>
     <string name="wifi_rescan">Buscar de nuevo</string>
     <string name="wifi_system_settings">Ajustes de red del sistema</string>
     <string name="wifi_connected">Conectado</string>

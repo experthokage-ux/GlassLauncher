@@ -8,8 +8,11 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.location.LocationManager
+import android.provider.Settings
 import android.net.wifi.WifiConfiguration
 import android.net.wifi.WifiManager
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -34,12 +37,20 @@ class WifiController(context: Context) {
         private set
     var networks by mutableStateOf<List<WifiNet>>(emptyList())
         private set
+    /** True until the first scan since opening the page has finished (or was refused). */
+    var searching by mutableStateOf(false)
+        private set
     /** Message shown under the list (connecting, failure, scan unavailable…). */
     var status by mutableStateOf<String?>(null)
 
     private var listening = false
+    private val main = Handler(Looper.getMainLooper())
+    private val giveUp = Runnable { searching = false; refresh() }
     private val receiver = object : BroadcastReceiver() {
-        override fun onReceive(context: Context, intent: Intent) = refresh()
+        override fun onReceive(context: Context, intent: Intent) {
+            if (intent.action == WifiManager.SCAN_RESULTS_AVAILABLE_ACTION) searching = false
+            refresh()
+        }
     }
 
     fun start() {
@@ -59,10 +70,18 @@ class WifiController(context: Context) {
     fun stop() {
         if (listening) runCatching { app.unregisterReceiver(receiver) }
         listening = false
+        main.removeCallbacks(giveUp)
     }
 
     fun scan() {
-        if (wm.isWifiEnabled) runCatching { wm.startScan() }
+        if (!wm.isWifiEnabled) return
+        // Some systems refuse or throttle scans: fall back to the last results instead of waiting forever.
+        val started = runCatching { wm.startScan() }.getOrDefault(false)
+        searching = started
+        main.removeCallbacks(giveUp)
+        if (started) main.postDelayed(giveUp, 15_000) // in case the "results available" broadcast never comes
+        if (!started) Log.i("Glass", "Wi-Fi: scan refused (sdk ${android.os.Build.VERSION.SDK_INT}, canScan ${canScan()})")
+        refresh()
     }
 
     fun refresh() {
@@ -81,6 +100,9 @@ class WifiController(context: Context) {
             emptyList()
         }
         val locationOff = app.getString(R.string.wifi_location_off)
+        if (results.isEmpty() && !searching) {
+            Log.i("Glass", "Wi-Fi: no scan results (sdk ${android.os.Build.VERSION.SDK_INT}, canScan ${canScan()})")
+        }
         if (results.isEmpty() && enabled && !canScan()) status = locationOff
         else if (status == locationOff) status = null
         networks = results
@@ -96,20 +118,29 @@ class WifiController(context: Context) {
                     connected = name == ssid,
                 )
             }
+            .let { list ->
+                // The current network may be missing from the results (scan refused, empty cache…).
+                if (ssid == null || list.any { it.ssid == ssid }) list
+                else list + WifiNet(ssid, level, secure = true, saved = true, connected = true)
+            }
             .sortedWith(compareByDescending<WifiNet> { it.connected }.thenByDescending { it.saved }.thenByDescending { it.level })
     }
 
     /**
      * Whether the system will hand Glass scan results. Android 13+ with NEARBY_WIFI_DEVICES needs nothing
-     * more; otherwise scanning needs location services turned on (Android 9+ enforces it).
+     * more; otherwise scanning needs location services turned on (Android 6+).
      */
     private fun canScan(): Boolean {
         if (android.os.Build.VERSION.SDK_INT >= 33 &&
             app.checkSelfPermission(android.Manifest.permission.NEARBY_WIFI_DEVICES) == PackageManager.PERMISSION_GRANTED
         ) return true
-        if (android.os.Build.VERSION.SDK_INT < 28) return true
-        val lm = app.getSystemService(Context.LOCATION_SERVICE) as LocationManager
-        return lm.isLocationEnabled
+        if (android.os.Build.VERSION.SDK_INT >= 28) {
+            val lm = app.getSystemService(Context.LOCATION_SERVICE) as LocationManager
+            return lm.isLocationEnabled
+        }
+        // Android 6 to 8 also only return scan results while location is on.
+        return Settings.Secure.getInt(app.contentResolver, Settings.Secure.LOCATION_MODE, Settings.Secure.LOCATION_MODE_OFF) !=
+            Settings.Secure.LOCATION_MODE_OFF
     }
 
     /** Android 10+: apps can no longer turn Wi-Fi on or off, or save networks themselves. */

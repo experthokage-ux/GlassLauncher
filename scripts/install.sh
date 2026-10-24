@@ -14,7 +14,8 @@ adb -s "$T" install -r "$APK"
 for p in ACCESS_COARSE_LOCATION ACCESS_FINE_LOCATION NEARBY_WIFI_DEVICES READ_EXTERNAL_STORAGE WRITE_SECURE_SETTINGS; do
   adb -s "$T" shell pm grant com.fares.glass "android.permission.$p" 2>/dev/null || true
 done
-# Android 9-12: the system only returns Wi-Fi scan results while location is on.
-adb -s "$T" shell cmd location set-location-enabled true 2>/dev/null || true
+# Android 6-12: the system only returns Wi-Fi scan results while location is on.
+adb -s "$T" shell cmd location set-location-enabled true 2>/dev/null \
+  || adb -s "$T" shell settings put secure location_mode 3 2>/dev/null || true
 adb -s "$T" shell am start -n com.fares.glass/.MainActivity
 echo "Glass is installed. Set it as your home screen (see README)."
