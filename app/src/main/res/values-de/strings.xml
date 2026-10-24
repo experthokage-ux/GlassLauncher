@@ -49,6 +49,7 @@
     <string name="wifi_password_hint">Zum Verbinden auf der Tastatur bestätigen · Zurück zum Abbrechen</string>
     <string name="wifi_connecting">Verbindung mit %s…</string>
     <string name="wifi_scan_no_location">Suche nicht möglich: Standortberechtigung fehlt</string>
+    <string name="wifi_location_off">Standort in den Einstellungen aktivieren, um Netzwerke zu sehen</string>
     <string name="wifi_save_failed">Netzwerk konnte nicht gespeichert werden</string>
     <string name="wifi_connect_failed">Verbindung mit %s fehlgeschlagen</string>
 

@@ -49,6 +49,7 @@
     <string name="wifi_password_hint">Confirma en el teclado para conectar · Atrás para cancelar</string>
     <string name="wifi_connecting">Conectando a %s…</string>
     <string name="wifi_scan_no_location">No se puede buscar: falta el permiso de ubicación</string>
+    <string name="wifi_location_off">Activa la ubicación en los ajustes para ver las redes</string>
     <string name="wifi_save_failed">No se pudo guardar esta red</string>
     <string name="wifi_connect_failed">No se pudo conectar a %s</string>
 

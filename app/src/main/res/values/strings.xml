@@ -51,6 +51,7 @@
     <string name="wifi_password_hint">Confirm on the keyboard to connect · Back to cancel</string>
     <string name="wifi_connecting">Connecting to %s…</string>
     <string name="wifi_scan_no_location">Can’t search: location permission missing</string>
+    <string name="wifi_location_off">Turn on location in the system settings to see networks</string>
     <string name="wifi_save_failed">Couldn’t save this network</string>
     <string name="wifi_connect_failed">Couldn’t connect to %s</string>
 

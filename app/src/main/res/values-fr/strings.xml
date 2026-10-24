@@ -50,6 +50,7 @@
     <string name="wifi_password_hint">Validez sur le clavier pour vous connecter · Retour pour annuler</string>
     <string name="wifi_connecting">Connexion à %s…</string>
     <string name="wifi_scan_no_location">Recherche impossible : permission de localisation manquante</string>
+    <string name="wifi_location_off">Activez la localisation dans les réglages pour voir les réseaux</string>
     <string name="wifi_save_failed">Impossible d’enregistrer ce réseau</string>
     <string name="wifi_connect_failed">Échec de la connexion à %s</string>
 

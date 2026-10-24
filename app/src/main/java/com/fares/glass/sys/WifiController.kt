@@ -6,6 +6,8 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.content.pm.PackageManager
+import android.location.LocationManager
 import android.net.wifi.WifiConfiguration
 import android.net.wifi.WifiManager
 import android.util.Log
@@ -78,6 +80,9 @@ class WifiController(context: Context) {
             status = app.getString(R.string.wifi_scan_no_location)
             emptyList()
         }
+        val locationOff = app.getString(R.string.wifi_location_off)
+        if (results.isEmpty() && enabled && !canScan()) status = locationOff
+        else if (status == locationOff) status = null
         networks = results
             .filter { it.SSID.isNotBlank() }
             .groupBy { it.SSID }
@@ -92,6 +97,19 @@ class WifiController(context: Context) {
                 )
             }
             .sortedWith(compareByDescending<WifiNet> { it.connected }.thenByDescending { it.saved }.thenByDescending { it.level })
+    }
+
+    /**
+     * Whether the system will hand Glass scan results. Android 13+ with NEARBY_WIFI_DEVICES needs nothing
+     * more; otherwise scanning needs location services turned on (Android 9+ enforces it).
+     */
+    private fun canScan(): Boolean {
+        if (android.os.Build.VERSION.SDK_INT >= 33 &&
+            app.checkSelfPermission(android.Manifest.permission.NEARBY_WIFI_DEVICES) == PackageManager.PERMISSION_GRANTED
+        ) return true
+        if (android.os.Build.VERSION.SDK_INT < 28) return true
+        val lm = app.getSystemService(Context.LOCATION_SERVICE) as LocationManager
+        return lm.isLocationEnabled
     }
 
     /** Android 10+: apps can no longer turn Wi-Fi on or off, or save networks themselves. */

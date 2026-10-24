@@ -50,6 +50,7 @@
     <string name="wifi_password_hint">Confirme no teclado para ligar · Voltar para cancelar</string>
     <string name="wifi_connecting">A ligar a %s…</string>
     <string name="wifi_scan_no_location">Não é possível procurar: falta a permissão de localização</string>
+    <string name="wifi_location_off">Ative a localização nas definições para ver as redes</string>
     <string name="wifi_save_failed">Não foi possível guardar esta rede</string>
     <string name="wifi_connect_failed">Não foi possível ligar a %s</string>
 
