@@ -45,6 +45,7 @@ import androidx.compose.ui.input.key.KeyEvent
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.IntOffset
@@ -53,6 +54,7 @@ import com.fares.glass.R
 import com.fares.glass.data.AppEntry
 import com.fares.glass.data.AppRepository
 import com.fares.glass.data.Weather
+import com.fares.glass.sys.NowPlaying
 
 sealed interface Command {
     data object Settings : Command
@@ -86,8 +88,11 @@ fun HomeScreen(
 ) {
     val apps = repo.apps
     val density = LocalDensity.current
+    val context = LocalContext.current
     val focusRequester = remember { FocusRequester() }
     LaunchedEffect(Unit) { focusRequester.requestFocus() }
+    // Lets the now playing card see which media is playing.
+    LaunchedEffect(Unit) { NowPlaying.ensureListener(context) }
     // Wi-Fi password entry finished: the remote drives the home screen again.
     LaunchedEffect(cc.typing) { if (!cc.typing) focusRequester.requestFocus() }
     LaunchedEffect(apps.size) {
@@ -227,10 +232,16 @@ fun HomeScreen(
             AndroidKey.KEYCODE_DPAD_DOWN -> if (down) move(0, 1)
             AndroidKey.KEYCODE_BACK -> if (down && e.repeatCount == 0) back()
             AndroidKey.KEYCODE_MENU -> if (down && e.repeatCount == 0) menuKey()
-            AndroidKey.KEYCODE_MEDIA_PLAY_PAUSE -> if (down && state.mode == Mode.Jiggle) {
-                state.menuIndex = 0
-                state.mode = Mode.Menu
+            AndroidKey.KEYCODE_MEDIA_PLAY_PAUSE -> if (down) {
+                if (state.mode == Mode.Jiggle) {
+                    state.menuIndex = 0
+                    state.mode = Mode.Menu
+                } else if (!NowPlaying.togglePlayPause()) {
+                    return false
+                }
             }
+            AndroidKey.KEYCODE_MEDIA_NEXT -> if (down && !NowPlaying.next()) return false
+            AndroidKey.KEYCODE_MEDIA_PREVIOUS -> if (down && !NowPlaying.previous()) return false
             else -> return false
         }
         return true
@@ -292,6 +303,11 @@ fun HomeScreen(
                 TopBar(
                     backdrop, top, if (state.mode == Mode.Top) state.topIndex else -1,
                     Modifier.align(Alignment.TopEnd).padding(top = 34.dp, end = Metrics.Margin).graphicsLayer { alpha = headerAlpha },
+                )
+                // Now playing: only visible while something is playing.
+                NowPlayingCard(
+                    backdrop,
+                    Modifier.align(Alignment.TopEnd).padding(top = 84.dp, end = Metrics.Margin).graphicsLayer { alpha = headerAlpha },
                 )
             }
         }
