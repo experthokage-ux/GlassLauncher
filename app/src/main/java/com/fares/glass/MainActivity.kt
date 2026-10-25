@@ -22,7 +22,11 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.lifecycle.lifecycleScope
 import com.fares.glass.data.AppEntry
 import com.fares.glass.data.AppRepository
+import com.fares.glass.data.Weather
+import com.fares.glass.data.WeatherRepository
 import com.fares.glass.gfx.Blur
+import com.fares.glass.gfx.SkyPhase
+import com.fares.glass.gfx.SkyWallpaper
 import com.fares.glass.gfx.Wallpapers
 import com.fares.glass.ui.Backdrop
 import com.fares.glass.ui.Command
@@ -37,6 +41,7 @@ import com.fares.glass.sys.SettingsShortcuts
 import androidx.activity.result.contract.ActivityResultContracts
 import com.fares.glass.sys.WifiController
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -47,10 +52,17 @@ class MainActivity : ComponentActivity() {
     private val backdrop = Backdrop()
     private val wallpaper = mutableStateOf<ImageBitmap?>(null)
     private val wallpaperName = mutableStateOf("")
+    private val raining = mutableStateOf(false)
     private lateinit var cc: ControlCenter
     private val permissions = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
         cc.onPermissionsResult()
     }
+
+    // Weather and location (defaults: Haligue Silangan; override with --es lat / --es lon over ADB).
+    private var weather: Weather? = null
+    private var lat = WeatherRepository.DEFAULT_LAT
+    private var lon = WeatherRepository.DEFAULT_LON
+    private var skyKey = ""
 
     private val packages = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
@@ -64,6 +76,8 @@ class MainActivity : ComponentActivity() {
         repo = AppRepository(this)
         Typo.load(this)
         intent.getStringExtra("name")?.let(repo::setName)
+        loadLocation()
+        readLocation(intent)
         cc = ControlCenter(
             this, repo, WifiController(this), BluetoothController(this), SystemInfo(this), SettingsShortcuts(this),
             onOpen = ::startSafely,
@@ -89,10 +103,19 @@ class MainActivity : ComponentActivity() {
                 HomeScreen(
                     repo, home, backdrop, wallpaper.value, wallpaperName.value, cc,
                     onLaunch = ::launch, onCommand = ::run,
+                    raining = raining.value,
                 )
             }
         }
         loadWallpaper()
+
+        // Refresh the weather every 10 minutes; the sky changes with the time of day and the rain.
+        lifecycleScope.launch {
+            while (true) {
+                refreshWeather()
+                delay(10 * 60_000L)
+            }
+        }
     }
 
     override fun onResume() {
@@ -108,6 +131,7 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         intent.getStringExtra("name")?.let(repo::setName)
+        if (readLocation(intent)) lifecycleScope.launch { refreshWeather() }
         if (intent.hasCategory(Intent.CATEGORY_HOME)) home.goHome()
     }
 
@@ -116,8 +140,22 @@ class MainActivity : ComponentActivity() {
         super.onDestroy()
     }
 
+    // ---- Wallpaper ----
+
+    /** The last entry in the wallpaper list is "Auto": sky by time of day, plus rain. */
+    private fun isAutoSelected(): Boolean {
+        val count = Wallpapers.count(this)
+        return repo.wallpaperIndex % (count + 1) == count
+    }
+
     private fun loadWallpaper() {
-        val index = repo.wallpaperIndex % Wallpapers.count(this)
+        if (isAutoSelected()) {
+            applySky(force = true)
+            return
+        }
+        raining.value = false
+        skyKey = ""
+        val index = repo.wallpaperIndex % (Wallpapers.count(this) + 1)
         lifecycleScope.launch {
             val (sharp, frosted) = withContext(Dispatchers.Default) {
                 val src = Wallpapers.load(this@MainActivity, index)
@@ -129,6 +167,59 @@ class MainActivity : ComponentActivity() {
             wallpaperName.value = Wallpapers.name(this@MainActivity, index)
         }
     }
+
+    private fun applySky(force: Boolean) {
+        val w = weather
+        val (fallbackRise, fallbackSet) = WeatherRepository.fallbackTimes()
+        val phase = SkyWallpaper.phase(
+            System.currentTimeMillis(), w?.sunrise ?: fallbackRise, w?.sunset ?: fallbackSet,
+        )
+        val rain = w?.isRaining == true
+        raining.value = rain
+        wallpaperName.value = "Auto (sky & weather)"
+
+        val key = "$phase-$rain"
+        if (!force && key == skyKey) return
+        skyKey = key
+
+        lifecycleScope.launch {
+            val (sharp, frosted) = withContext(Dispatchers.Default) {
+                val src = SkyWallpaper.render(phase, rain)
+                src to Blur.frosted(src, 480, 10f, 1.45f, 1.0f)
+            }
+            if (!isAutoSelected()) return@launch // the user switched wallpaper meanwhile
+            wallpaper.value = sharp.asImageBitmap()
+            backdrop.frosted = frosted.asImageBitmap()
+        }
+    }
+
+    // ---- Weather ----
+
+    private suspend fun refreshWeather() {
+        WeatherRepository.fetch(lat, lon)?.let { weather = it }
+        if (isAutoSelected()) applySky(force = false)
+    }
+
+    private fun loadLocation() {
+        val prefs = getSharedPreferences("glass_location", Context.MODE_PRIVATE)
+        prefs.getString("lat", null)?.toDoubleOrNull()?.let { lat = it }
+        prefs.getString("lon", null)?.toDoubleOrNull()?.let { lon = it }
+    }
+
+    /** Reads --es lat / --es lon from an intent. Returns true if the location changed. */
+    private fun readLocation(i: Intent): Boolean {
+        val newLat = i.getStringExtra("lat")?.toDoubleOrNull() ?: return false
+        val newLon = i.getStringExtra("lon")?.toDoubleOrNull() ?: return false
+        lat = newLat
+        lon = newLon
+        getSharedPreferences("glass_location", Context.MODE_PRIVATE).edit()
+            .putString("lat", newLat.toString())
+            .putString("lon", newLon.toString())
+            .apply()
+        return true
+    }
+
+    // ---- Launching ----
 
     private fun launch(entry: AppEntry, from: Rect) {
         val options = ActivityOptions.makeScaleUpAnimation(window.decorView, from.left, from.top, from.width(), from.height())
@@ -150,7 +241,7 @@ class MainActivity : ComponentActivity() {
                 Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", command.pkg, null)),
             )
             Command.NextWallpaper -> {
-                repo.setWallpaper((repo.wallpaperIndex + 1) % Wallpapers.count(this))
+                repo.setWallpaper((repo.wallpaperIndex + 1) % (Wallpapers.count(this) + 1))
                 loadWallpaper()
             }
         }
