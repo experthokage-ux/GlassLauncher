@@ -11,9 +11,20 @@ import java.util.Locale
 import java.util.TimeZone
 import kotlin.math.roundToInt
 
-data class Weather(val tempC: Int, val code: Int, val sunrise: Long, val sunset: Long) {
+data class Weather(
+    val tempC: Int,
+    val code: Int,
+    val sunrise: Long,
+    val sunset: Long,
+    val isPlaceholder: Boolean = false,
+) {
     /** Drizzle, rain, showers, thunderstorm. */
     val isRaining get() = code in 51..67 || code in 80..82 || code in 95..99
+
+    companion object {
+        /** Shown before the first real answer arrives. */
+        val Placeholder = Weather(0, 0, 0L, 0L, isPlaceholder = true)
+    }
 }
 
 object WeatherRepository {
