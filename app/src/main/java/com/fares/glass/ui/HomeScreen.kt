@@ -17,10 +17,13 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row // NEW
+import androidx.compose.foundation.layout.Spacer // NEW
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width // NEW
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -48,6 +51,7 @@ import androidx.compose.ui.unit.dp
 import com.fares.glass.R
 import com.fares.glass.data.AppEntry
 import com.fares.glass.data.AppRepository
+import com.fares.glass.data.Weather // NEW
 
 sealed interface Command {
     data object Settings : Command
@@ -76,7 +80,8 @@ fun HomeScreen(
     cc: ControlCenter,
     onLaunch: (AppEntry, Rect) -> Unit,
     onCommand: (Command) -> Unit,
-    raining: Boolean = false, // NEW
+    raining: Boolean = false,
+    weather: Weather? = null, // NEW
 ) {
     val apps = repo.apps
     val density = LocalDensity.current
@@ -256,7 +261,7 @@ fun HomeScreen(
                 Image(img, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop, filterQuality = FilterQuality.Low)
             }
         }
-        if (raining) RainOverlay(Modifier.fillMaxSize()) // NEW
+        if (raining) RainOverlay(Modifier.fillMaxSize())
         Box(
             Modifier.fillMaxSize().background(
                 Brush.verticalGradient(0f to Color.Transparent, 0.45f to Color.Black.copy(alpha = 0.05f), 1f to Color.Black.copy(alpha = 0.5f)),
@@ -268,7 +273,17 @@ fun HomeScreen(
         val dockAlpha by animateFloatAsState(if (row == 0) 1f else 0f, tween(300), label = "dock")
         val headerAlpha by animateFloatAsState(if (row == 0) 1f else 0f, tween(300), label = "header")
         if (headerAlpha > 0f) {
-            HomeHeader(repo.userName, Modifier.padding(start = Metrics.Margin, top = 30.dp).graphicsLayer { alpha = headerAlpha })
+            // NEW: the header (greeting, clock, date) with the weather widget right next to it.
+            Row(
+                Modifier.padding(start = Metrics.Margin, top = 30.dp).graphicsLayer { alpha = headerAlpha },
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                HomeHeader(repo.userName, Modifier)
+                if (weather != null) {
+                    Spacer(Modifier.width(28.dp))
+                    WeatherWidget(weather)
+                }
+            }
             if (state.mode != Mode.Control) {
                 TopBar(
                     backdrop, top, if (state.mode == Mode.Top) state.topIndex else -1,
