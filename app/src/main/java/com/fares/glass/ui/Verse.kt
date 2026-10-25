@@ -1,7 +1,10 @@
 package com.fares.glass.ui
 
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -66,9 +69,9 @@ private fun currentIndex(): Int {
     return (slot % verses.size).toInt()
 }
 
-/** A verse in a classic serif font, meant to sit under the date. */
+/** A verse in a classic serif font, inside a glass box like the top buttons. */
 @Composable
-fun VerseText(modifier: Modifier = Modifier) {
+fun VerseText(backdrop: Backdrop, modifier: Modifier = Modifier) {
     var index by remember { mutableStateOf(currentIndex()) }
 
     // Check once a minute whether it is time for the next verse.
@@ -82,26 +85,35 @@ fun VerseText(modifier: Modifier = Modifier) {
     val (text, reference) = verses[index]
     val shadow = Shadow(Color.Black.copy(alpha = 0.35f), Offset(0f, 2f), 6f)
 
-    Column(modifier.widthIn(max = 420.dp)) {
-        BasicText(
-            "\u201C$text\u201D",
-            style = TextStyle(
-                color = Color.White.copy(alpha = 0.9f),
-                fontSize = 15.sp,
-                fontFamily = FontFamily.Serif,
-                fontStyle = FontStyle.Italic,
-                lineHeight = 21.sp,
-                shadow = shadow,
-            ),
+    Box(modifier.widthIn(max = 420.dp)) {
+        // The glass layer sits behind the text and matches its size.
+        Glass(
+            backdrop,
+            Modifier.matchParentSize(),
+            shape = RoundedCornerShape(20.dp),
+            tint = Color.White.copy(alpha = 0.10f),
         )
-        BasicText(
-            "\u2014 $reference",
-            style = TextStyle(
-                color = Color.White.copy(alpha = 0.7f),
-                fontSize = 13.sp,
-                fontFamily = FontFamily.Serif,
-                shadow = shadow,
-            ),
-        )
+        Column(Modifier.padding(horizontal = 18.dp, vertical = 12.dp)) {
+            BasicText(
+                "\u201C$text\u201D",
+                style = TextStyle(
+                    color = Color.White.copy(alpha = 0.95f),
+                    fontSize = 14.sp,
+                    fontFamily = FontFamily.Serif,
+                    fontStyle = FontStyle.Italic,
+                    lineHeight = 20.sp,
+                    shadow = shadow,
+                ),
+            )
+            BasicText(
+                "\u2014 $reference",
+                style = TextStyle(
+                    color = Color.White.copy(alpha = 0.75f),
+                    fontSize = 14.sp,
+                    fontFamily = FontFamily.Serif,
+                    shadow = shadow,
+                ),
+            )
+        }
     }
 }
