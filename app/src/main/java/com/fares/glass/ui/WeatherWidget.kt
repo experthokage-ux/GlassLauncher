@@ -1,5 +1,6 @@
 package com.fares.glass.ui
 
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -11,7 +12,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 import com.fares.glass.data.Weather
 
-/** Plain text weather next to the clock, e.g. "☀️ 31°C Sunny". */
+/** The city shown above the weather. Change it here. */
+private const val CITY = "Haligue Silangan"
+
+/** City name, then the weather under it, e.g. "☀️ 31°C Sunny". */
 @Composable
 fun WeatherWidget(weather: Weather, modifier: Modifier = Modifier) {
     val text = if (weather.isPlaceholder) {
@@ -23,17 +27,29 @@ fun WeatherWidget(weather: Weather, modifier: Modifier = Modifier) {
         "$icon ${weather.tempC}°C $label"
     }
 
-    BasicText(
-        text,
-        modifier = modifier,
-        style = TextStyle(
-            color = Color.White,
-            fontSize = 28.sp,
-            fontWeight = FontWeight.Medium,
-            // Soft shadow so it stays readable on bright skies.
-            shadow = Shadow(Color.Black.copy(alpha = 0.35f), Offset(0f, 2f), 6f),
-        ),
-    )
+    // Soft shadow so it stays readable on bright skies.
+    val shadow = Shadow(Color.Black.copy(alpha = 0.35f), Offset(0f, 2f), 6f)
+
+    Column(modifier) {
+        BasicText(
+            CITY,
+            style = TextStyle(
+                color = Color.White.copy(alpha = 0.8f),
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Medium,
+                shadow = shadow,
+            ),
+        )
+        BasicText(
+            text,
+            style = TextStyle(
+                color = Color.White,
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Medium,
+                shadow = shadow,
+            ),
+        )
+    }
 }
 
 private fun describe(code: Int, day: Boolean): Pair<String, String> = when (code) {
