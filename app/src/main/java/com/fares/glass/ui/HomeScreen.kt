@@ -286,7 +286,7 @@ fun HomeScreen(
                         WeatherWidget(weather)
                     }
                 }
-                VerseText(Modifier.padding(top = 8.dp))
+                VerseText(backdrop, Modifier.padding(top = 8.dp))
             }
             if (state.mode != Mode.Control) {
                 TopBar(
