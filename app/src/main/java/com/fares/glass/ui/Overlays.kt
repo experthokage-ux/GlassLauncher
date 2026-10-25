@@ -54,6 +54,9 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
+/** Shown after the greeting, e.g. "Good evening, Cena Family". Change it here. */
+private const val FAMILY_NAME = "Cena Family"
+
 class ControlItem(val icon: ImageVector, val title: String, val subtitle: String?)
 
 @Composable
@@ -154,12 +157,13 @@ fun rememberClock(now: Long): Pair<String, String> {
 fun HomeHeader(name: String, modifier: Modifier) {
     val now = rememberNow()
     val hour = remember(now / 60000) { java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY) }
-    val (plain, named) = when (hour) {
-        in 5..11 -> R.string.greeting_morning to R.string.greeting_morning_name
-        in 12..17 -> R.string.greeting_afternoon to R.string.greeting_afternoon_name
-        else -> R.string.greeting_evening to R.string.greeting_evening_name
+    val plain = when (hour) {
+        in 5..11 -> R.string.greeting_morning
+        in 12..17 -> R.string.greeting_afternoon
+        else -> R.string.greeting_evening
     }
-    val greeting = if (name.isBlank()) stringResource(plain) else stringResource(named, name)
+    // "Good evening, Cena Family" (or the name set over ADB, if there is one).
+    val greeting = stringResource(plain) + ", " + name.ifBlank { FAMILY_NAME }
     val (time, date) = rememberClock(now)
     Column(modifier) {
         BasicText(greeting, style = txt(white, 17.sp, FontWeight.SemiBold).copy(shadow = headerShadow))
