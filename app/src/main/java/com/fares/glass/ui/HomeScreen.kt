@@ -76,6 +76,7 @@ fun HomeScreen(
     cc: ControlCenter,
     onLaunch: (AppEntry, Rect) -> Unit,
     onCommand: (Command) -> Unit,
+    raining: Boolean = false, // NEW
 ) {
     val apps = repo.apps
     val density = LocalDensity.current
@@ -255,6 +256,7 @@ fun HomeScreen(
                 Image(img, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop, filterQuality = FilterQuality.Low)
             }
         }
+        if (raining) RainOverlay(Modifier.fillMaxSize()) // NEW
         Box(
             Modifier.fillMaxSize().background(
                 Brush.verticalGradient(0f to Color.Transparent, 0.45f to Color.Black.copy(alpha = 0.05f), 1f to Color.Black.copy(alpha = 0.5f)),
