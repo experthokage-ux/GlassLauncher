@@ -3,6 +3,8 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
+val tmdbKey: String = System.getenv("TMDB_API_KEY") ?: ""
+
 android {
     namespace = "com.fares.glass"
     compileSdk = 36
@@ -12,8 +14,9 @@ android {
         // Fire TV Stick 4K (1st gen): Fire OS 6 = Android 7.1 (API 25).
         minSdk = 25
         targetSdk = 36
-        versionCode = 5
-        versionName = "2.2.1"
+        versionCode = 2
+        versionName = "2.0"
+        buildConfigField("String", "TMDB_API_KEY", "\"$tmdbKey\"")
     }
 
     buildTypes {
@@ -28,7 +31,7 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-    buildFeatures { compose = true }
+    buildFeatures { compose = true; buildConfig = true }
     lint {
         abortOnError = false
         checkReleaseBuilds = false
@@ -43,4 +46,5 @@ dependencies {
     implementation("androidx.compose.material:material-icons-extended")
     implementation("androidx.activity:activity-compose:1.10.1")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.7")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
 }
