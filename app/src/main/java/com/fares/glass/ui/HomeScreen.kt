@@ -17,6 +17,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -273,16 +274,19 @@ fun HomeScreen(
         val dockAlpha by animateFloatAsState(if (row == 0) 1f else 0f, tween(300), label = "dock")
         val headerAlpha by animateFloatAsState(if (row == 0) 1f else 0f, tween(300), label = "header")
         if (headerAlpha > 0f) {
-            // Header (greeting, clock, date) with the weather text right next to it.
-            Row(
+            // Header (greeting, clock, date) with the weather text right next to it,
+            // and the verse of the moment under the date.
+            Column(
                 Modifier.padding(start = Metrics.Margin, top = 30.dp).graphicsLayer { alpha = headerAlpha },
-                verticalAlignment = Alignment.CenterVertically,
             ) {
-                HomeHeader(repo.userName, Modifier)
-                if (weather != null) {
-                    Spacer(Modifier.width(28.dp))
-                    WeatherWidget(weather)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    HomeHeader(repo.userName, Modifier)
+                    if (weather != null) {
+                        Spacer(Modifier.width(28.dp))
+                        WeatherWidget(weather)
+                    }
                 }
+                VerseText(Modifier.padding(top = 8.dp))
             }
             if (state.mode != Mode.Control) {
                 TopBar(
