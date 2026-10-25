@@ -7,13 +7,13 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.withFrameNanos
 import kotlin.random.Random
 
-/** Light rain streaks drawn above the wallpaper and below the UI. No allocations per frame. */
+/** Light rain streaks drawn above the wallpaper and below the UI. */
 @Composable
 fun RainOverlay(modifier: Modifier = Modifier) {
     val count = 70
@@ -41,7 +41,7 @@ fun RainOverlay(modifier: Modifier = Modifier) {
     Canvas(modifier) {
         val w = size.width
         val h = size.height
-        val time = t // read here so only drawing is redone each frame
+        val time = t
         for (d in drops) {
             val len = d[3] * h
             val y = ((d[1] + time * d[2] * 0.9f) % 1f) * (h + len) - len
