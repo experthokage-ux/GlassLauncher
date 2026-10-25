@@ -65,6 +65,8 @@ private val DockInset = 20.dp
 private val DockTop = 18.dp
 /** Covers the row and the focus zoom (no names under dock icons). */
 private val DockHeight = Metrics.TileH + 36.dp
+/** Top of the TMDB poster row (the space above the dock); tweak if it overlaps the clock. */
+private val CatalogY = 172.dp
 
 @Composable
 fun HomeScreen(
@@ -80,6 +82,10 @@ fun HomeScreen(
     val apps = repo.apps
     val density = LocalDensity.current
     val focusRequester = remember { FocusRequester() }
+    val weather by rememberWeather()
+    val catalog by rememberTrending()
+    val titles = catalog
+    val track by rememberNowPlaying()
     LaunchedEffect(Unit) { focusRequester.requestFocus() }
     // Wi-Fi password entry finished: the remote drives the home screen again.
     LaunchedEffect(cc.typing) { if (!cc.typing) focusRequester.requestFocus() }
@@ -119,17 +125,38 @@ fun HomeScreen(
     fun move(dx: Int, dy: Int) {
         when (state.mode) {
             Mode.Browse -> {
+                if (state.catalogIndex >= 0) {
+                    // Inside the TMDB poster row.
+                    when {
+                        dy > 0 -> state.catalogIndex = -1
+                        dy < 0 -> {
+                            state.catalogIndex = -1
+                            state.topIndex = top.lastIndex
+                            state.mode = Mode.Top
+                        }
+                        dx != 0 -> state.catalogIndex = (state.catalogIndex + dx).coerceIn(0, titles.lastIndex)
+                    }
+                    return
+                }
                 if (dy < 0 && row == 0) {
-                    // Above the dock: the glass buttons at the top right.
-                    state.topIndex = top.lastIndex
-                    state.mode = Mode.Top
+                    if (titles.isNotEmpty()) {
+                        // Above the dock: the poster row first.
+                        state.catalogIndex = 0
+                    } else {
+                        // No posters: the glass buttons at the top right.
+                        state.topIndex = top.lastIndex
+                        state.mode = Mode.Top
+                    }
                     return
                 }
                 HomeState.target(state.focus, dx, dy, apps.size)?.let { state.focus = it }
                 state.bump(dx, dy)
             }
             Mode.Top -> when {
-                dy > 0 -> state.mode = Mode.Browse
+                dy > 0 -> {
+                    state.mode = Mode.Browse
+                    if (titles.isNotEmpty()) state.catalogIndex = 0
+                }
                 dx != 0 -> state.topIndex = (state.topIndex + dx).coerceIn(0, top.lastIndex)
             }
             Mode.Jiggle -> HomeState.target(state.focus, dx, dy, apps.size)?.let {
@@ -143,7 +170,7 @@ fun HomeScreen(
 
     fun select() {
         when (state.mode) {
-            Mode.Browse -> launchFocused()
+            Mode.Browse -> if (state.catalogIndex < 0) launchFocused()
             Mode.Top -> {
                 // The top buttons open the Control Center straight on the matching page.
                 cc.open(when (state.topIndex) { 0 -> CcPage.Wifi; 1 -> CcPage.Bluetooth; else -> CcPage.Main })
@@ -167,7 +194,7 @@ fun HomeScreen(
     }
 
     fun longPress() {
-        if (state.mode == Mode.Browse && focused != null) {
+        if (state.mode == Mode.Browse && state.catalogIndex < 0 && focused != null) {
             state.menuIndex = 0
             state.mode = Mode.Menu
         }
@@ -177,7 +204,8 @@ fun HomeScreen(
         when (state.mode) {
             Mode.Menu, Mode.Control, Mode.Top -> state.mode = Mode.Browse
             Mode.Jiggle -> { repo.saveOrder(); state.mode = Mode.Browse }
-            Mode.Browse -> if (row > 0) state.focus %= Metrics.COLS
+            Mode.Browse -> if (state.catalogIndex >= 0) state.catalogIndex = -1
+                else if (row > 0) state.focus %= Metrics.COLS
         }
     }
 
@@ -200,7 +228,7 @@ fun HomeScreen(
                     if (e.repeatCount == 0) {
                         state.centerDownAt = e.eventTime
                         state.longFired = false
-                        state.pressed = state.mode == Mode.Browse
+                        state.pressed = state.mode == Mode.Browse && state.catalogIndex < 0
                     } else if (!state.longFired && state.centerDownAt >= 0 && e.eventTime - state.centerDownAt > LONG_PRESS_MS) {
                         state.longFired = true
                         state.pressed = false
@@ -220,9 +248,14 @@ fun HomeScreen(
             AndroidKey.KEYCODE_DPAD_DOWN -> if (down) move(0, 1)
             AndroidKey.KEYCODE_BACK -> if (down && e.repeatCount == 0) back()
             AndroidKey.KEYCODE_MENU -> if (down && e.repeatCount == 0) menuKey()
-            AndroidKey.KEYCODE_MEDIA_PLAY_PAUSE -> if (down && state.mode == Mode.Jiggle) {
-                state.menuIndex = 0
-                state.mode = Mode.Menu
+            AndroidKey.KEYCODE_MEDIA_PLAY_PAUSE -> if (down && e.repeatCount == 0) {
+                if (state.mode == Mode.Jiggle) {
+                    state.menuIndex = 0
+                    state.mode = Mode.Menu
+                } else if (state.mode == Mode.Browse) {
+                    // Play/pause key on the remote controls the "now playing" tile.
+                    track?.toggle?.invoke()
+                }
             }
             else -> return false
         }
@@ -273,6 +306,25 @@ fun HomeScreen(
                     Modifier.align(Alignment.TopEnd).padding(top = 34.dp, end = Metrics.Margin).graphicsLayer { alpha = headerAlpha },
                 )
             }
+            // Now playing, under the top buttons (only while something is playing).
+            track?.let {
+                NowPlayingTile(
+                    it, backdrop,
+                    Modifier.align(Alignment.TopEnd).padding(top = 100.dp, end = Metrics.Margin)
+                        .graphicsLayer { alpha = headerAlpha },
+                )
+            }
+            // TMDB posters above the dock.
+            TmdbRow(
+                titles, if (state.mode == Mode.Browse) state.catalogIndex else -1, backdrop,
+                Modifier.offset(y = CatalogY).graphicsLayer { alpha = headerAlpha },
+            )
+            // Weather along the bottom edge.
+            WeatherPill(
+                weather, backdrop,
+                Modifier.align(Alignment.BottomStart).padding(start = Metrics.Margin, bottom = 10.dp)
+                    .graphicsLayer { alpha = headerAlpha },
+            )
         }
         if (dockAlpha > 0f) {
             Glass(
@@ -298,7 +350,7 @@ fun HomeScreen(
                 AppTile(
                     entry = entry,
                     visual = repo.visuals[entry.pkg],
-                    focused = i == state.focus && state.mode != Mode.Control && state.mode != Mode.Top,
+                    focused = i == state.focus && state.mode != Mode.Control && state.mode != Mode.Top && state.catalogIndex < 0,
                     pressed = i == state.focus && state.pressed,
                     jiggling = state.mode == Mode.Jiggle && i == state.focus,
                     showLabel = i >= Metrics.COLS,
