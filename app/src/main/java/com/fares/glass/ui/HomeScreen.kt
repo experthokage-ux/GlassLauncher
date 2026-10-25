@@ -17,13 +17,13 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Row // NEW
-import androidx.compose.foundation.layout.Spacer // NEW
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width // NEW
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -51,7 +51,7 @@ import androidx.compose.ui.unit.dp
 import com.fares.glass.R
 import com.fares.glass.data.AppEntry
 import com.fares.glass.data.AppRepository
-import com.fares.glass.data.Weather // NEW
+import com.fares.glass.data.Weather
 
 sealed interface Command {
     data object Settings : Command
@@ -81,7 +81,7 @@ fun HomeScreen(
     onLaunch: (AppEntry, Rect) -> Unit,
     onCommand: (Command) -> Unit,
     raining: Boolean = false,
-    weather: Weather? = null, // NEW
+    weather: Weather? = null,
 ) {
     val apps = repo.apps
     val density = LocalDensity.current
@@ -273,7 +273,7 @@ fun HomeScreen(
         val dockAlpha by animateFloatAsState(if (row == 0) 1f else 0f, tween(300), label = "dock")
         val headerAlpha by animateFloatAsState(if (row == 0) 1f else 0f, tween(300), label = "header")
         if (headerAlpha > 0f) {
-            // NEW: the header (greeting, clock, date) with the weather widget right next to it.
+            // Header (greeting, clock, date) with the weather text right next to it.
             Row(
                 Modifier.padding(start = Metrics.Margin, top = 30.dp).graphicsLayer { alpha = headerAlpha },
                 verticalAlignment = Alignment.CenterVertically,
