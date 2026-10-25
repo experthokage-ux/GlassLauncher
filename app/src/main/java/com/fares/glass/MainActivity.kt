@@ -25,7 +25,6 @@ import com.fares.glass.data.AppRepository
 import com.fares.glass.data.Weather
 import com.fares.glass.data.WeatherRepository
 import com.fares.glass.gfx.Blur
-import com.fares.glass.gfx.SkyPhase
 import com.fares.glass.gfx.SkyWallpaper
 import com.fares.glass.gfx.Wallpapers
 import com.fares.glass.ui.Backdrop
@@ -53,6 +52,7 @@ class MainActivity : ComponentActivity() {
     private val wallpaper = mutableStateOf<ImageBitmap?>(null)
     private val wallpaperName = mutableStateOf("")
     private val raining = mutableStateOf(false)
+    private val weatherState = mutableStateOf<Weather?>(null) // NEW: read by the weather widget
     private lateinit var cc: ControlCenter
     private val permissions = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
         cc.onPermissionsResult()
@@ -104,6 +104,7 @@ class MainActivity : ComponentActivity() {
                     repo, home, backdrop, wallpaper.value, wallpaperName.value, cc,
                     onLaunch = ::launch, onCommand = ::run,
                     raining = raining.value,
+                    weather = weatherState.value, // NEW
                 )
             }
         }
@@ -196,7 +197,10 @@ class MainActivity : ComponentActivity() {
     // ---- Weather ----
 
     private suspend fun refreshWeather() {
-        WeatherRepository.fetch(lat, lon)?.let { weather = it }
+        WeatherRepository.fetch(lat, lon)?.let {
+            weather = it
+            weatherState.value = it // NEW
+        }
         if (isAutoSelected()) applySky(force = false)
     }
 
