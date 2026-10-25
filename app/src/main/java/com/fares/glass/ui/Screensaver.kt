@@ -6,7 +6,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Text
+import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -18,6 +18,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
@@ -59,8 +60,8 @@ fun Screensaver(wallpaper: ImageBitmap?, modifier: Modifier = Modifier) {
             )
         }
         Column(Modifier.align(spots[slot % spots.size]).padding(64.dp)) {
-            Text(time, fontSize = 96.sp, color = Color.White)
-            Text(date, fontSize = 24.sp, color = Color.White.copy(alpha = 0.7f))
+            BasicText(time, style = TextStyle(color = Color.White, fontSize = 96.sp))
+            BasicText(date, style = TextStyle(color = Color.White.copy(alpha = 0.7f), fontSize = 24.sp))
         }
     }
 }
