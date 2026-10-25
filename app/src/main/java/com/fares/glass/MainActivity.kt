@@ -52,7 +52,8 @@ class MainActivity : ComponentActivity() {
     private val wallpaper = mutableStateOf<ImageBitmap?>(null)
     private val wallpaperName = mutableStateOf("")
     private val raining = mutableStateOf(false)
-    private val weatherState = mutableStateOf<Weather?>(null) // NEW: read by the weather widget
+    // Starts as a placeholder so the text shows "--°C" until the first real answer arrives.
+    private val weatherState = mutableStateOf<Weather?>(Weather.Placeholder)
     private lateinit var cc: ControlCenter
     private val permissions = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
         cc.onPermissionsResult()
@@ -104,17 +105,18 @@ class MainActivity : ComponentActivity() {
                     repo, home, backdrop, wallpaper.value, wallpaperName.value, cc,
                     onLaunch = ::launch, onCommand = ::run,
                     raining = raining.value,
-                    weather = weatherState.value, // NEW
+                    weather = weatherState.value,
                 )
             }
         }
         loadWallpaper()
 
-        // Refresh the weather every 10 minutes; the sky changes with the time of day and the rain.
+        // Refresh the weather every 10 minutes. If a request fails (for example the Wi-Fi is not up yet
+        // after boot), try again after 30 seconds instead of waiting the full 10 minutes.
         lifecycleScope.launch {
             while (true) {
-                refreshWeather()
-                delay(10 * 60_000L)
+                val ok = refreshWeather()
+                delay(if (ok) 10 * 60_000L else 30_000L)
             }
         }
     }
@@ -196,12 +198,15 @@ class MainActivity : ComponentActivity() {
 
     // ---- Weather ----
 
-    private suspend fun refreshWeather() {
-        WeatherRepository.fetch(lat, lon)?.let {
-            weather = it
-            weatherState.value = it // NEW
+    /** Returns true if the weather was fetched successfully. */
+    private suspend fun refreshWeather(): Boolean {
+        val result = WeatherRepository.fetch(lat, lon)
+        if (result != null) {
+            weather = result
+            weatherState.value = result
         }
         if (isAutoSelected()) applySky(force = false)
+        return result != null
     }
 
     private fun loadLocation() {
