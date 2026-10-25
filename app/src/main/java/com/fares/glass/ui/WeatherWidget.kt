@@ -14,12 +14,17 @@ import com.fares.glass.data.Weather
 /** Plain text weather next to the clock, e.g. "☀️ 31°C Sunny". */
 @Composable
 fun WeatherWidget(weather: Weather, modifier: Modifier = Modifier) {
-    val now = System.currentTimeMillis()
-    val day = now > weather.sunrise && now < weather.sunset
-    val (icon, label) = describe(weather.code, day)
+    val text = if (weather.isPlaceholder) {
+        "☁️ --°C"
+    } else {
+        val now = System.currentTimeMillis()
+        val day = now > weather.sunrise && now < weather.sunset
+        val (icon, label) = describe(weather.code, day)
+        "$icon ${weather.tempC}°C $label"
+    }
 
     BasicText(
-        "$icon ${weather.tempC}°C $label",
+        text,
         modifier = modifier,
         style = TextStyle(
             color = Color.White,
