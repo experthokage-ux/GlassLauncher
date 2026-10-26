@@ -2,6 +2,8 @@ package com.fares.glass.ui
 
 import android.os.SystemClock
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -20,6 +22,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.material.icons.Icons
@@ -39,10 +42,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.fares.glass.sys.NowPlaying
@@ -53,9 +60,29 @@ private fun fmt(ms: Long): String {
     return "%d:%02d".format(s / 60, s % 60)
 }
 
-/** Glass card with what is playing. It fades in and out by itself. */
+/** Round button: plain icon at rest, a white circle with a dark icon when selected. */
 @Composable
-fun NowPlayingCard(backdrop: Backdrop, modifier: Modifier = Modifier) {
+private fun MediaButton(icon: ImageVector, iconSize: Dp, focused: Boolean) {
+    val f by animateFloatAsState(if (focused) 1f else 0f, spring(stiffness = 600f), label = "mediaButton")
+    val fg = lerp(Color.White, Color(0xFF111114), f)
+    Box(
+        Modifier
+            .size(iconSize + 18.dp)
+            .graphicsLayer { scaleX = 1f + 0.12f * f; scaleY = 1f + 0.12f * f }
+            .clip(CircleShape)
+            .background(Color.White.copy(alpha = 0.94f * f)),
+        contentAlignment = Alignment.Center,
+    ) {
+        Image(rememberVectorPainter(icon), null, Modifier.size(iconSize), colorFilter = ColorFilter.tint(fg))
+    }
+}
+
+/**
+ * Glass card with what is playing. It fades in and out by itself.
+ * focus: -1 = none, 0 = previous, 1 = play/pause, 2 = next.
+ */
+@Composable
+fun NowPlayingCard(backdrop: Backdrop, focus: Int, modifier: Modifier = Modifier) {
     var now by remember { mutableLongStateOf(SystemClock.elapsedRealtime()) }
     LaunchedEffect(NowPlaying.active) {
         while (NowPlaying.active) {
@@ -103,30 +130,22 @@ fun NowPlayingCard(backdrop: Backdrop, modifier: Modifier = Modifier) {
                     }
                 }
 
-                Spacer(Modifier.height(10.dp))
+                Spacer(Modifier.height(6.dp))
                 Row(
                     Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.Center,
+                    horizontalArrangement = Arrangement.spacedBy(14.dp, Alignment.CenterHorizontally),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Image(
-                        rememberVectorPainter(Icons.Rounded.SkipPrevious), null, Modifier.size(26.dp),
-                        colorFilter = ColorFilter.tint(Color.White),
+                    MediaButton(Icons.Rounded.SkipPrevious, 26.dp, focus == 0)
+                    MediaButton(
+                        if (NowPlaying.playing) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
+                        32.dp, focus == 1,
                     )
-                    Spacer(Modifier.width(24.dp))
-                    Image(
-                        rememberVectorPainter(if (NowPlaying.playing) Icons.Rounded.Pause else Icons.Rounded.PlayArrow),
-                        null, Modifier.size(32.dp), colorFilter = ColorFilter.tint(Color.White),
-                    )
-                    Spacer(Modifier.width(24.dp))
-                    Image(
-                        rememberVectorPainter(Icons.Rounded.SkipNext), null, Modifier.size(26.dp),
-                        colorFilter = ColorFilter.tint(Color.White),
-                    )
+                    MediaButton(Icons.Rounded.SkipNext, 26.dp, focus == 2)
                 }
 
                 if (NowPlaying.durationMs > 0) {
-                    Spacer(Modifier.height(10.dp))
+                    Spacer(Modifier.height(6.dp))
                     val pos = NowPlaying.position(now)
                     val fraction = (pos.toFloat() / NowPlaying.durationMs).coerceIn(0f, 1f)
                     Row(verticalAlignment = Alignment.CenterVertically) {
