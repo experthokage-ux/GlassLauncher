@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -46,10 +47,12 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.key.KeyEvent
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import com.fares.glass.R
@@ -57,6 +60,7 @@ import com.fares.glass.data.AppEntry
 import com.fares.glass.data.AppRepository
 import com.fares.glass.data.Weather
 import com.fares.glass.sys.NowPlaying
+import kotlin.math.roundToInt
 
 sealed interface Command {
     data object Settings : Command
@@ -75,6 +79,33 @@ private val DockTop = 18.dp
 /** Covers the row and the focus zoom (no names under dock icons). */
 private val DockHeight = Metrics.TileH + 36.dp
 
+/** Top padding of the greeting column. */
+private val HeaderTop = 30.dp
+
+/** Shrinks its content (it never enlarges it) so that it fits the space it is given. */
+@Composable
+private fun FitScale(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
+    Layout(content = content, modifier = modifier) { measurables, constraints ->
+        val placeable = measurables.firstOrNull()?.measure(Constraints())
+        if (placeable == null || placeable.width == 0 || placeable.height == 0) {
+            layout(0, 0) {}
+        } else {
+            val s = minOf(
+                1f,
+                constraints.maxWidth.toFloat() / placeable.width,
+                constraints.maxHeight.toFloat() / placeable.height,
+            ).coerceAtLeast(0f)
+            layout((placeable.width * s).roundToInt(), (placeable.height * s).roundToInt()) {
+                placeable.placeWithLayer(0, 0) {
+                    scaleX = s
+                    scaleY = s
+                    transformOrigin = TransformOrigin(0f, 0f)
+                }
+            }
+        }
+    }
+}
+
 @Composable
 fun HomeScreen(
     repo: AppRepository,
@@ -87,6 +118,8 @@ fun HomeScreen(
     onCommand: (Command) -> Unit,
     raining: Boolean = false,
     weather: Weather? = null,
+    /** True while the sky wallpaper (the one with the TV) is showing: lyrics go on its TV screen. */
+    tvWallpaper: Boolean = false,
 ) {
     val apps = repo.apps
     val density = LocalDensity.current
@@ -330,10 +363,22 @@ fun HomeScreen(
         val dockAlpha by animateFloatAsState(if (row == 0) 1f else 0f, tween(300), label = "dock")
         val headerAlpha by animateFloatAsState(if (row == 0) 1f else 0f, tween(300), label = "header")
         if (headerAlpha > 0f) {
+            // Lyrics of the song that is playing, on the TV screen of the sky wallpaper.
+            if (tvWallpaper) {
+                TvLyrics(Modifier.fillMaxSize().graphicsLayer { alpha = headerAlpha })
+            }
+
+            // On the sky wallpaper the left column must stay left of the TV and above the dock.
+            val tvLeft = (TvScreen.LEFT * 960f).dp
+            val columnHeight = maxOf(0.dp, Metrics.TopRowY - DockTop - HeaderTop - 10.dp)
+
             // Header (greeting, clock, date) with the weather text right next to it,
-            // and the verse of the moment under the date.
+            // the verse of the moment under the date, and (sky wallpaper) the now playing card under the verse.
             Column(
-                Modifier.padding(start = Metrics.Margin, top = 30.dp).graphicsLayer { alpha = headerAlpha },
+                Modifier
+                    .padding(start = Metrics.Margin, top = HeaderTop)
+                    .then(if (tvWallpaper) Modifier.height(columnHeight) else Modifier)
+                    .graphicsLayer { alpha = headerAlpha },
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     HomeHeader(repo.userName, Modifier)
@@ -342,7 +387,15 @@ fun HomeScreen(
                         WeatherWidget(weather)
                     }
                 }
-                VerseText(backdrop, Modifier.padding(top = 8.dp))
+                VerseText(
+                    backdrop, Modifier.padding(top = 8.dp),
+                    maxWidth = if (tvWallpaper) maxOf(160.dp, tvLeft - Metrics.Margin - 14.dp) else 420.dp,
+                )
+                if (tvWallpaper && state.mode != Mode.Control) {
+                    FitScale(Modifier.weight(1f).padding(top = 10.dp)) {
+                        NowPlayingCard(backdrop, mediaFocus, Modifier)
+                    }
+                }
             }
             if (state.mode != Mode.Control) {
                 TopBar(
@@ -351,10 +404,13 @@ fun HomeScreen(
                     Modifier.align(Alignment.TopEnd).padding(top = 34.dp, end = Metrics.Margin).graphicsLayer { alpha = headerAlpha },
                 )
                 // Now playing: visible while a music app is running (playing or paused).
-                NowPlayingCard(
-                    backdrop, mediaFocus,
-                    Modifier.align(Alignment.TopEnd).padding(top = 84.dp, end = Metrics.Margin).graphicsLayer { alpha = headerAlpha },
-                )
+                // With the sky wallpaper it sits under the verse instead (see above).
+                if (!tvWallpaper) {
+                    NowPlayingCard(
+                        backdrop, mediaFocus,
+                        Modifier.align(Alignment.TopEnd).padding(top = 84.dp, end = Metrics.Margin).graphicsLayer { alpha = headerAlpha },
+                    )
+                }
             }
         }
         if (dockAlpha > 0f) {
