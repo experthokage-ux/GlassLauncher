@@ -55,6 +55,8 @@ class MainActivity : ComponentActivity() {
     private val wallpaper = mutableStateOf<ImageBitmap?>(null)
     private val wallpaperName = mutableStateOf("")
     private val raining = mutableStateOf(false)
+    // True while the "Auto" sky wallpaper (the one with the TV) is selected: lyrics go on its TV screen.
+    private val skyWallpaper = mutableStateOf(false)
     // Starts as a placeholder so the text shows "--°C" until the first real answer arrives.
     private val weatherState = mutableStateOf<Weather?>(Weather.Placeholder)
     private lateinit var cc: ControlCenter
@@ -110,6 +112,7 @@ class MainActivity : ComponentActivity() {
                         onLaunch = ::launch, onCommand = ::run,
                         raining = raining.value,
                         weather = weatherState.value,
+                        tvWallpaper = skyWallpaper.value,
                     )
                 }
             }
@@ -157,6 +160,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun loadWallpaper() {
+        skyWallpaper.value = isAutoSelected()
         if (isAutoSelected()) {
             applySky(force = true)
             return
