@@ -239,8 +239,13 @@ class MainActivity : ComponentActivity() {
 
     // ---- Launching ----
 
-    private fun launch(entry: AppEntry, from: Rect) {
-        val options = ActivityOptions.makeScaleUpAnimation(window.decorView, from.left, from.top, from.width(), from.height())
+    /** from = where the system animation starts; null = no system animation (the launcher drew its own). */
+    private fun launch(entry: AppEntry, from: Rect?) {
+        val options = if (from != null) {
+            ActivityOptions.makeScaleUpAnimation(window.decorView, from.left, from.top, from.width(), from.height())
+        } else {
+            ActivityOptions.makeCustomAnimation(this, 0, 0)
+        }
         try {
             startActivity(entry.launchIntent(), options.toBundle())
         } catch (e: Exception) {
