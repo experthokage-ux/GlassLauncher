@@ -30,7 +30,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -90,9 +92,20 @@ fun HomeScreen(
     val density = LocalDensity.current
     val context = LocalContext.current
     val focusRequester = remember { FocusRequester() }
+    // Selected button on the now playing card: -1 = none, 0 = previous, 1 = play/pause, 2 = next.
+    var mediaFocus by remember { mutableIntStateOf(-1) }
     LaunchedEffect(Unit) { focusRequester.requestFocus() }
     // Lets the now playing card see which media is playing.
     LaunchedEffect(Unit) { NowPlaying.ensureListener(context) }
+    // Leaving the top row also leaves the card.
+    LaunchedEffect(state.mode) { if (state.mode != Mode.Top) mediaFocus = -1 }
+    // The card disappeared while it was selected: go back to the apps.
+    LaunchedEffect(NowPlaying.active) {
+        if (!NowPlaying.active && mediaFocus >= 0) {
+            mediaFocus = -1
+            state.mode = Mode.Browse
+        }
+    }
     // Wi-Fi password entry finished: the remote drives the home screen again.
     LaunchedEffect(cc.typing) { if (!cc.typing) focusRequester.requestFocus() }
     LaunchedEffect(apps.size) {
@@ -141,7 +154,8 @@ fun HomeScreen(
                 state.bump(dx, dy)
             }
             Mode.Top -> when {
-                dy > 0 -> state.mode = Mode.Browse
+                // Down from the top buttons: the now playing card if it is showing, otherwise the apps.
+                dy > 0 -> if (NowPlaying.active) mediaFocus = 1 else state.mode = Mode.Browse
                 dx != 0 -> state.topIndex = (state.topIndex + dx).coerceIn(0, top.lastIndex)
             }
             Mode.Jiggle -> HomeState.target(state.focus, dx, dy, apps.size)?.let {
@@ -205,6 +219,37 @@ fun HomeScreen(
         val e = event.nativeKeyEvent
         if (state.mode == Mode.Control) return cc.onKey(e)
         val down = e.action == AndroidKey.ACTION_DOWN
+
+        // A button on the now playing card is selected: the remote drives the card.
+        if (mediaFocus >= 0) {
+            var handled = true
+            when (e.keyCode) {
+                AndroidKey.KEYCODE_DPAD_LEFT -> if (down) mediaFocus = (mediaFocus - 1).coerceAtLeast(0)
+                AndroidKey.KEYCODE_DPAD_RIGHT -> if (down) mediaFocus = (mediaFocus + 1).coerceAtMost(2)
+                // Up goes back to the top buttons (the mode stays Top).
+                AndroidKey.KEYCODE_DPAD_UP -> if (down) mediaFocus = -1
+                // Down goes on to the apps.
+                AndroidKey.KEYCODE_DPAD_DOWN -> if (down) {
+                    mediaFocus = -1
+                    state.mode = Mode.Browse
+                }
+                AndroidKey.KEYCODE_DPAD_CENTER, AndroidKey.KEYCODE_ENTER, AndroidKey.KEYCODE_NUMPAD_ENTER,
+                AndroidKey.KEYCODE_BUTTON_A -> if (down && e.repeatCount == 0) {
+                    when (mediaFocus) {
+                        0 -> NowPlaying.previous()
+                        1 -> NowPlaying.togglePlayPause()
+                        else -> NowPlaying.next()
+                    }
+                }
+                AndroidKey.KEYCODE_BACK -> if (down && e.repeatCount == 0) {
+                    mediaFocus = -1
+                    state.mode = Mode.Browse
+                }
+                else -> handled = false
+            }
+            if (handled) return true
+        }
+
         when (e.keyCode) {
             AndroidKey.KEYCODE_DPAD_CENTER, AndroidKey.KEYCODE_ENTER, AndroidKey.KEYCODE_NUMPAD_ENTER,
             AndroidKey.KEYCODE_BUTTON_A -> {
@@ -301,12 +346,13 @@ fun HomeScreen(
             }
             if (state.mode != Mode.Control) {
                 TopBar(
-                    backdrop, top, if (state.mode == Mode.Top) state.topIndex else -1,
+                    backdrop, top,
+                    if (state.mode == Mode.Top && mediaFocus < 0) state.topIndex else -1,
                     Modifier.align(Alignment.TopEnd).padding(top = 34.dp, end = Metrics.Margin).graphicsLayer { alpha = headerAlpha },
                 )
-                // Now playing: only visible while something is playing.
+                // Now playing: visible while a music app is running (playing or paused).
                 NowPlayingCard(
-                    backdrop,
+                    backdrop, mediaFocus,
                     Modifier.align(Alignment.TopEnd).padding(top = 84.dp, end = Metrics.Margin).graphicsLayer { alpha = headerAlpha },
                 )
             }
