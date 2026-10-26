@@ -8,11 +8,8 @@ import android.content.IntentFilter
 import android.graphics.Rect
 import android.net.Uri
 import android.os.Bundle
-import android.os.SystemClock
 import android.provider.Settings
 import android.util.Log
-import android.view.KeyEvent
-import android.view.MotionEvent
 import androidx.activity.ComponentActivity
 import androidx.activity.addCallback
 import androidx.activity.compose.setContent
@@ -44,15 +41,11 @@ import com.fares.glass.ui.ControlCenter
 import com.fares.glass.ui.HomeScreen
 import com.fares.glass.ui.HomeState
 import com.fares.glass.ui.Mode
-import com.fares.glass.ui.Screensaver
 import com.fares.glass.ui.Typo
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-
-/** How long the TV can sit idle before the screensaver starts (5 minutes). */
-private const val IDLE_MS = 5 * 60_000L
 
 class MainActivity : ComponentActivity() {
 
@@ -68,13 +61,6 @@ class MainActivity : ComponentActivity() {
     private val permissions = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
         cc.onPermissionsResult()
     }
-
-    // Screensaver
-    private val idle = mutableStateOf(false)
-    private var lastInput = SystemClock.elapsedRealtime()
-    // Set when the accessibility service starts the screensaver on top of another app.
-    private var pendingSaver = false
-    private var overApp = false
 
     // Weather and location (defaults: Haligue Silangan; override with --es lat / --es lon over ADB).
     private var weather: Weather? = null
@@ -93,7 +79,6 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         repo = AppRepository(this)
         Typo.load(this)
-        pendingSaver = intent.getBooleanExtra("screensaver", false)
         intent.getStringExtra("name")?.let(repo::setName)
         loadLocation()
         readLocation(intent)
@@ -126,7 +111,6 @@ class MainActivity : ComponentActivity() {
                         raining = raining.value,
                         weather = weatherState.value,
                     )
-                    if (idle.value) Screensaver(wallpaper.value)
                 }
             }
         }
@@ -140,37 +124,20 @@ class MainActivity : ComponentActivity() {
                 delay(if (ok) 10 * 60_000L else 30_000L)
             }
         }
-
-        // Start the screensaver when nothing has been pressed for IDLE_MS while Glass is on screen.
-        lifecycleScope.launch {
-            while (true) {
-                delay(5_000L)
-                if (!idle.value && SystemClock.elapsedRealtime() - lastInput > IDLE_MS) {
-                    idle.value = true
-                }
-            }
-        }
     }
 
     override fun onResume() {
         super.onResume()
-        lastInput = SystemClock.elapsedRealtime()
-        idle.value = pendingSaver
-        overApp = pendingSaver
-        pendingSaver = false
         lifecycleScope.launch { repo.refresh() }
     }
 
     override fun onPause() {
         super.onPause()
-        idle.value = false
-        overApp = false
         if (home.mode == Mode.Control) cc.close()
     }
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
-        pendingSaver = intent.getBooleanExtra("screensaver", false)
         intent.getStringExtra("name")?.let(repo::setName)
         if (readLocation(intent)) lifecycleScope.launch { refreshWeather() }
         if (intent.hasCategory(Intent.CATEGORY_HOME)) home.goHome()
@@ -179,45 +146,6 @@ class MainActivity : ComponentActivity() {
     override fun onDestroy() {
         unregisterReceiver(packages)
         super.onDestroy()
-    }
-
-    // ---- Screensaver wake-up ----
-
-    /** Hides the screensaver. If it was covering another app, go back to that app. */
-    private fun wake() {
-        idle.value = false
-        if (overApp) {
-            overApp = false
-            moveTaskToBack(true)
-        }
-    }
-
-    // While the screensaver is showing, the first button press only wakes it up and is not passed on.
-    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
-        lastInput = SystemClock.elapsedRealtime()
-        if (idle.value) {
-            if (event.action == KeyEvent.ACTION_UP) wake()
-            return true
-        }
-        return super.dispatchKeyEvent(event)
-    }
-
-    override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
-        lastInput = SystemClock.elapsedRealtime()
-        if (idle.value) {
-            if (ev.action == MotionEvent.ACTION_UP) wake()
-            return true
-        }
-        return super.dispatchTouchEvent(ev)
-    }
-
-    override fun dispatchGenericMotionEvent(ev: MotionEvent): Boolean {
-        lastInput = SystemClock.elapsedRealtime()
-        if (idle.value) {
-            wake()
-            return true
-        }
-        return super.dispatchGenericMotionEvent(ev)
     }
 
     // ---- Wallpaper ----
