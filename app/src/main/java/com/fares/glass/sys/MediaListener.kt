@@ -21,6 +21,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 
 /** What is playing right now, for the card on the home screen. */
 object NowPlaying {
+    /** True while a music app has a session (playing or paused). The card shows only then. */
     var active by mutableStateOf(false)
     var playing by mutableStateOf(false)
     var title by mutableStateOf("")
@@ -39,6 +40,14 @@ object NowPlaying {
         return s == PlaybackState.STATE_PLAYING || s == PlaybackState.STATE_BUFFERING
     }
 
+    /** Playing or paused: the app is still running. Stopped, errored or no state means it is gone. */
+    fun isLive(c: MediaController): Boolean {
+        val s = c.playbackState?.state ?: return false
+        return s != PlaybackState.STATE_NONE &&
+            s != PlaybackState.STATE_STOPPED &&
+            s != PlaybackState.STATE_ERROR
+    }
+
     fun attach(c: MediaController?) {
         controller = c
         refresh()
@@ -54,7 +63,7 @@ object NowPlaying {
         val state = c.playbackState
         val meta = c.metadata
         playing = isPlaying(c)
-        active = playing
+        active = isLive(c)
         title = meta?.getString(MediaMetadata.METADATA_KEY_TITLE)
             ?: meta?.getString(MediaMetadata.METADATA_KEY_DISPLAY_TITLE) ?: ""
         artist = meta?.getString(MediaMetadata.METADATA_KEY_ARTIST)
@@ -165,9 +174,10 @@ class MediaListener : NotificationListenerService() {
         choose()
     }
 
-    /** Prefer the session that is playing; otherwise the first one. */
+    /** Prefer the session that is playing; otherwise one that is paused. None means the card hides. */
     private fun choose() {
-        val best = controllers.firstOrNull { NowPlaying.isPlaying(it) } ?: controllers.firstOrNull()
+        val best = controllers.firstOrNull { NowPlaying.isPlaying(it) }
+            ?: controllers.firstOrNull { NowPlaying.isLive(it) }
         NowPlaying.attach(best)
     }
 }
