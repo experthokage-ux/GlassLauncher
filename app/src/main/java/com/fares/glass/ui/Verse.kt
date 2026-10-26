@@ -19,6 +19,7 @@ import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
@@ -69,9 +70,12 @@ private fun currentIndex(): Int {
     return (slot % verses.size).toInt()
 }
 
-/** A verse in a classic serif font, inside a glass box like the top buttons. */
+/**
+ * A verse in a classic serif font, inside a glass box like the top buttons.
+ * maxWidth: the box never gets wider than this (narrower on the sky wallpaper, to stay off the TV).
+ */
 @Composable
-fun VerseText(backdrop: Backdrop, modifier: Modifier = Modifier) {
+fun VerseText(backdrop: Backdrop, modifier: Modifier = Modifier, maxWidth: Dp = 420.dp) {
     var index by remember { mutableStateOf(currentIndex()) }
 
     // Check once a minute whether it is time for the next verse.
@@ -85,7 +89,7 @@ fun VerseText(backdrop: Backdrop, modifier: Modifier = Modifier) {
     val (text, reference) = verses[index]
     val shadow = Shadow(Color.Black.copy(alpha = 0.35f), Offset(0f, 2f), 6f)
 
-    Box(modifier.widthIn(max = 420.dp)) {
+    Box(modifier.widthIn(max = maxWidth)) {
         // The glass layer sits behind the text and matches its size.
         Glass(
             backdrop,
