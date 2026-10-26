@@ -4,6 +4,7 @@ import android.graphics.Rect
 import android.view.KeyEvent as AndroidKey
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
@@ -13,6 +14,7 @@ import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
@@ -28,15 +30,21 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -44,6 +52,7 @@ import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.input.key.KeyEvent
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.layout.ContentScale
@@ -60,6 +69,11 @@ import com.fares.glass.data.AppEntry
 import com.fares.glass.data.AppRepository
 import com.fares.glass.data.Weather
 import com.fares.glass.sys.NowPlaying
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.LifecycleOwner
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
 sealed interface Command {
@@ -114,7 +128,8 @@ fun HomeScreen(
     wallpaper: ImageBitmap?,
     wallpaperName: String,
     cc: ControlCenter,
-    onLaunch: (AppEntry, Rect) -> Unit,
+    // The Rect is where the system animation starts; null = no system animation (the launcher drew its own).
+    onLaunch: (AppEntry, Rect?) -> Unit,
     onCommand: (Command) -> Unit,
     raining: Boolean = false,
     weather: Weather? = null,
@@ -128,6 +143,21 @@ fun HomeScreen(
     // Selected button on the now playing card: -1 = none, 0 = previous, 1 = play/pause, 2 = next.
     var mediaFocus by remember { mutableIntStateOf(-1) }
     LaunchedEffect(Unit) { focusRequester.requestFocus() }
+    // Sky wallpaper: an app opens out of the TV screen. 'launching' is true from the press until we are back.
+    var launching by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+    val owner = context as? LifecycleOwner
+    // Back on the home screen (the app was closed): the picture shrinks back into the TV.
+    DisposableEffect(owner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) launching = false
+        }
+        owner?.lifecycle?.addObserver(observer)
+        onDispose { owner?.lifecycle?.removeObserver(observer) }
+    }
+    val tvGrow by animateFloatAsState(
+        if (launching) 1f else 0f, tween(320, easing = FastOutSlowInEasing), label = "tvLaunch",
+    )
     // Lets the now playing card see which media is playing.
     LaunchedEffect(Unit) { NowPlaying.ensureListener(context) }
     // Leaving the top row also leaves the card.
@@ -166,6 +196,20 @@ fun HomeScreen(
 
     fun launchFocused() {
         val entry = focused ?: return
+        if (tvWallpaper) {
+            // Sky wallpaper: the TV screen grows to fill the display, then the app opens (without the system animation).
+            if (launching) return
+            launching = true
+            scope.launch {
+                delay(320)
+                onLaunch(entry, null)
+                // If the app never took over (launch failed), show the home screen again.
+                delay(2500)
+                if (owner?.lifecycle?.currentState == Lifecycle.State.RESUMED) launching = false
+            }
+            return
+        }
+        // Other wallpapers: the original animation, out of the app's tile.
         val r = with(density) {
             val x = tileX(state.focus).roundToPx()
             val y = tileY(state.focus).dp.roundToPx()
@@ -250,6 +294,7 @@ fun HomeScreen(
 
     fun onKey(event: KeyEvent): Boolean {
         val e = event.nativeKeyEvent
+        if (launching) return true // the opening animation is running
         if (state.mode == Mode.Control) return cc.onKey(e)
         val down = e.action == AndroidKey.ACTION_DOWN
 
@@ -488,6 +533,24 @@ fun HomeScreen(
             }
         }
         cc.PasswordLayer(backdrop) { focusRequester.requestFocus() }
+
+        // Opening animation: the TV screen of the sky wallpaper grows to the full display.
+        if (tvGrow > 0.001f) {
+            Canvas(Modifier.fillMaxSize()) {
+                val tv = TvScreen.bounds(size.width.roundToInt(), size.height.roundToInt())
+                val t = tvGrow
+                val left = tv.left * (1f - t)
+                val top = tv.top * (1f - t)
+                val right = tv.right + (size.width - tv.right) * t
+                val bottom = tv.bottom + (size.height - tv.bottom) * t
+                drawRoundRect(
+                    color = lerp(Color(0xFF2B3A5C), Color.Black, t),
+                    topLeft = Offset(left, top),
+                    size = Size(right - left, bottom - top),
+                    cornerRadius = CornerRadius(8.dp.toPx() * (1f - t)),
+                )
+            }
+        }
     }
 
 }
